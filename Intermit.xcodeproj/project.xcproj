@@ -11,7 +11,7 @@
     ],
   },
   "files": [
-    { "kind": "folder", "path": "iFast", "target-membership": [ "Intermit" ] },
+    { "kind": "folder", "path": "Intermit", "target-membership": [ "Intermit" ] },
     {
       "kind": "group",
       "name": "Products",

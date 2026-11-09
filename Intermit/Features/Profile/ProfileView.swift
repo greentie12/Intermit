@@ -6,7 +6,32 @@ struct ProfileView: View {
     var stats: FastingStats = .sample
 
     @AppStorage(AppearanceMode.storageKey) private var appearance: AppearanceMode = .system
+    @AppStorage(NotificationService.storageKey) private var notificationsEnabled = false
     @State private var showingSubscriptionNotice = false
+    @State private var showingNotificationsDenied = false
+
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
+
+    /// Turning the toggle on asks iOS for permission; if the user declines,
+    /// the toggle switches back off and explains how to allow it in Settings.
+    private var notificationsBinding: Binding<Bool> {
+        Binding {
+            notificationsEnabled
+        } set: { isOn in
+            notificationsEnabled = isOn
+            if isOn {
+                Task {
+                    if !(await NotificationService.requestAuthorization()) {
+                        notificationsEnabled = false
+                        showingNotificationsDenied = true
+                    }
+                }
+            } else {
+                NotificationService.removeAllPending()
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,6 +69,12 @@ struct ProfileView: View {
                         SettingsLabel("Appearance", systemImage: "circle.lefthalf.filled")
                     }
 
+                    Toggle(isOn: notificationsBinding) {
+                        SettingsLabel("Notifications", systemImage: "bell.fill")
+                    }
+                }
+
+                Section("Support and Legal") {
                     SettingsLinkRow(
                         title: "Privacy Policy",
                         systemImage: "hand.raised.fill",
@@ -78,6 +109,22 @@ struct ProfileView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("Subscriptions aren't available yet.")
+            }
+            .alert("Notifications Are Off", isPresented: $showingNotificationsDenied) {
+                if let url = NotificationService.settingsURL {
+                    Button("Open Settings") { openURL(url) }
+                }
+                Button("Not Now", role: .cancel) {}
+            } message: {
+                Text("To get reminders, allow notifications for Intermit in Settings.")
+            }
+            // Keep the toggle honest if notifications were turned off in the
+            // Settings app while Intermit was in the background.
+            .task(id: scenePhase) {
+                guard scenePhase == .active, notificationsEnabled else { return }
+                if !(await NotificationService.isAuthorized()) {
+                    notificationsEnabled = false
+                }
             }
         }
     }
@@ -161,6 +208,7 @@ private struct StatItem: View {
                 Image(systemName: systemImage)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.tint)
+                    .accessibilityHidden(true) // Decorative; the text says it all
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -203,6 +251,7 @@ private struct SettingsLabel: View {
             Image(systemName: systemImage)
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.tint)
+                .accessibilityHidden(true) // Decorative; the text says it all
         }
     }
 }
