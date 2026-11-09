@@ -1,10 +1,11 @@
 import SwiftUI
 
 @main
-struct iFastApp: App {
+struct IntermitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .fontDesign(.rounded) // Global rounded font
         }
     }
 }
