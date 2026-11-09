@@ -117,9 +117,6 @@ struct ActivePlanCard: View {
                 } else {
                     // Start button with modern Liquid Glass look
                     Button {
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.success)
-
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
                             startSession()
                         }
@@ -129,7 +126,6 @@ struct ActivePlanCard: View {
                     }
                     .buttonStyle(.glassProminent)
                     .tint(.accentColor)
-                    .sensoryFeedback(.success, trigger: isFasting) // iOS 17+
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -159,6 +155,9 @@ struct ActivePlanCard: View {
             }
             .shadow(color: .black.opacity(0.08), radius: 16, y: 8)
             .animation(.spring(response: 0.35, dampingFraction: 0.9), value: isFasting)
+            // Attached to the card (not the Start button) because the button
+            // leaves the screen as soon as the fast begins.
+            .sensoryFeedback(.success, trigger: isFasting)
         }
     }
 
