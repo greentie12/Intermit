@@ -11,20 +11,20 @@
     ],
   },
   "files": [
-    { "kind": "folder", "path": "iFast", "target-membership": [ "iFast" ] },
+    { "kind": "folder", "path": "iFast", "target-membership": [ "Intermit" ] },
     {
       "kind": "group",
       "name": "Products",
       "children": [
-        { "path": "<PRODUCTS>/iFast.app", "id": "000000000000000000000120", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/Intermit.app", "id": "000000000000000000000120", "type": "wrapper.application", "index": false },
       ],
     },
   ],
   "targets": [
     {
-      "name": "iFast",
+      "name": "Intermit",
       "id": "000000000000000100000000",
-      "product": "Products/iFast.app",
+      "product": "Products/Intermit.app",
       "product-type": "application",
       "build-phases": [
         "compile-sources",
