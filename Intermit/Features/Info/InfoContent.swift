@@ -179,6 +179,9 @@ struct FastingStage: Identifiable {
     let startHour: Int
     let title: LocalizedStringResource
     let detail: LocalizedStringResource
+    /// What this stage may mean for the user, shown during a live fast. Keep
+    /// it modest: fasting mainly helps by giving eating a structure.
+    let benefit: LocalizedStringResource
     let systemImage: String
 }
 
@@ -189,6 +192,7 @@ extension FastingStage {
             startHour: 0,
             title: "Digesting",
             detail: "Your body digests your last meal and uses its energy. Blood sugar and insulin rise, then gradually fall.",
+            benefit: "Nothing special yet. This is normal digestion, and a good time to drink water.",
             systemImage: "fork.knife"
         ),
         FastingStage(
@@ -196,6 +200,7 @@ extension FastingStage {
             startHour: 4,
             title: "Blood Sugar Settles",
             detail: "Digestion winds down and insulin returns to its normal level. Your body starts drawing on stored sugar (glycogen) for energy.",
+            benefit: "A regular daily break like this may help your body respond to insulin.",
             systemImage: "drop.fill"
         ),
         FastingStage(
@@ -203,6 +208,7 @@ extension FastingStage {
             startHour: 12,
             title: "Switching to Fat",
             detail: "As glycogen runs low, your body burns more fat for fuel and begins making ketones, an alternative energy source.",
+            benefit: "Your body is leaning on its own stores. Over time, the bigger benefit is a routine that helps you eat less overall.",
             systemImage: "flame.fill"
         ),
         FastingStage(
@@ -210,6 +216,7 @@ extension FastingStage {
             startHour: 18,
             title: "Ketones Rise",
             detail: "Ketone levels keep climbing. Some people notice steadier energy and less hunger around this point.",
+            benefit: "Some people feel more focused here, but research on fasts this long is limited. Stop if you feel unwell.",
             systemImage: "bolt.fill"
         ),
         FastingStage(
@@ -217,7 +224,18 @@ extension FastingStage {
             startHour: 24,
             title: "Deeper Fasting",
             detail: "Research, mostly in animals, suggests cells step up autophagy, their natural process for recycling worn-out parts. How much this happens in people is still being studied.",
+            benefit: "Benefits in people aren't proven. Fasts this long aren't recommended, so plan to eat soon.",
             systemImage: "arrow.triangle.2.circlepath"
         ),
     ]
+
+    /// The stage reached after fasting for `hours`.
+    static func stage(atHours hours: Double) -> FastingStage {
+        all.last { Double($0.startHour) <= hours } ?? all[0]
+    }
+
+    /// The stage after this one, if any.
+    var next: FastingStage? {
+        FastingStage.all.first { $0.startHour > startHour }
+    }
 }

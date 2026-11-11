@@ -36,6 +36,7 @@ struct PlanDetailView: View {
 
     @AppStorage(PlanGuide.activePlanStorageKey) private var activePlanID = ""
     @AppStorage(PlanGuide.customHoursStorageKey) private var customHours = 16
+    @Environment(FastingStore.self) private var fastingStore
 
     @State private var currentPage: PlanPage = .overview
     /// Visible height of the scroll view, so each page can fill one screen.
@@ -45,6 +46,7 @@ struct PlanDetailView: View {
 
     @State private var showingAdvancedConfirmation = false
     @State private var showingCustomSetup = false
+    @State private var showingWeeklySetup = false
     @State private var startCount = 0
 
     private var isActive: Bool { activePlanID == plan.id }
@@ -88,19 +90,33 @@ struct PlanDetailView: View {
         .navigationTitle(plan.name)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaBar(edge: .bottom) {
-            startButton
-                .padding(.horizontal, 20)
-                .padding(.bottom, 8)
+            VStack(spacing: 6) {
+                startButton
+                // Choosing a plan doesn't start a fast; make that clear.
+                Text(isActive
+                     ? "Start your fast from Home whenever you're ready."
+                     : "You'll start fasting from Home.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
         }
         .confirmationDialog(
-            Text("Start \(plan.name)?"),
+            Text("Choose \(plan.name)?"),
             isPresented: $showingAdvancedConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Start Plan") { start() }
+            Button("Choose Plan") { beginStart() }
             Button("Not Now", role: .cancel) {}
         } message: {
             Text("This is an Advanced plan. \(Text(plan.readiness))")
+        }
+        .sheet(isPresented: $showingWeeklySetup) {
+            WeeklyScheduleSetup(plan: plan, existing: fastingStore.weeklySchedule) {
+                activePlanID = plan.id
+                startCount += 1
+            }
         }
         .sheet(isPresented: $showingCustomSetup) {
             CustomPlanSetup(initialHours: customHours) { hours in
@@ -192,14 +208,21 @@ struct PlanDetailView: View {
     private var startButton: some View {
         if isActive {
             Button {
-                if case .custom = plan.schedule { showingCustomSetup = true }
+                if plan.isCustom {
+                    showingCustomSetup = true
+                } else if plan.weeklyRule != nil {
+                    showingWeeklySetup = true
+                }
             } label: {
                 Label(currentPlanTitle, systemImage: "checkmark.circle.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glass)
             .controlSize(.large)
-            .accessibilityHint(plan.isCustom ? Text("Change your fasting hours") : Text(""))
+            .accessibilityHint(
+                plan.isCustom ? Text("Change your fasting hours")
+                    : plan.weeklyRule != nil ? Text("Change your fast days") : Text("")
+            )
         } else {
             Button {
                 if plan.isCustom {
@@ -207,10 +230,10 @@ struct PlanDetailView: View {
                 } else if plan.tier == .advanced {
                     showingAdvancedConfirmation = true
                 } else {
-                    start()
+                    beginStart()
                 }
             } label: {
-                Label("Start \(plan.name)", systemImage: "play.fill")
+                Label("Choose This Plan", systemImage: "checkmark.circle")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
@@ -220,6 +243,15 @@ struct PlanDetailView: View {
 
     private var currentPlanTitle: LocalizedStringResource {
         plan.isCustom ? "Current Plan · \(customHours) h fast" : "Your Current Plan"
+    }
+
+    /// Weekly plans need their fast days chosen first; others start right away.
+    private func beginStart() {
+        if plan.weeklyRule != nil {
+            showingWeeklySetup = true
+        } else {
+            start()
+        }
     }
 
     private func start() {
@@ -744,7 +776,7 @@ private struct CustomPlanSetup: View {
                     Button("Cancel", role: .cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Start") {
+                    Button("Choose") {
                         onStart(hours)
                         dismiss()
                     }
@@ -759,16 +791,19 @@ private struct CustomPlanSetup: View {
     NavigationStack {
         PlanDetailView(plan: .fourteenTen)
     }
+    .environment(FastingStore.preview())
 }
 
 #Preview("4:3") {
     NavigationStack {
         PlanDetailView(plan: .fourThree)
     }
+    .environment(FastingStore.preview())
 }
 
 #Preview("OMAD") {
     NavigationStack {
         PlanDetailView(plan: .omad)
     }
+    .environment(FastingStore.preview())
 }

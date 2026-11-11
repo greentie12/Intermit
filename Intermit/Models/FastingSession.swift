@@ -1,16 +1,22 @@
 import Foundation
 
 /// A single fast, from when the user started it to when they ended it.
-struct FastingSession: Identifiable, Hashable, Sendable {
+struct FastingSession: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let start: Date
     /// `nil` while the fast is still in progress.
     var end: Date?
+    /// The `PlanGuide` this fast followed, if any.
+    var planID: String?
+    /// How long the user aimed to fast, in hours, fixed when the fast starts.
+    var goalHours: Double?
 
-    init(id: UUID = UUID(), start: Date, end: Date? = nil) {
+    init(id: UUID = UUID(), start: Date, end: Date? = nil, planID: String? = nil, goalHours: Double? = nil) {
         self.id = id
         self.start = start
         self.end = end
+        self.planID = planID
+        self.goalHours = goalHours
     }
 
     var isOngoing: Bool { end == nil }

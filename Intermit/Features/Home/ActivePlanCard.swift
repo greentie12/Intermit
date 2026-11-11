@@ -1,142 +1,198 @@
 import SwiftUI
 
-/// Card at the top of the Home page showing the user's active fasting plan,
-/// or a prompt to get started if they haven't chosen one yet.
+/// Card at the top of the Home page. Shows the user's plan with a Start
+/// Fasting button, or the fast in progress with a live clock. Tapping a fast
+/// in progress opens its details.
 struct ActivePlanCard: View {
-    let plan: FastingPlan?
+    /// Called when the user needs to pick a plan first.
+    var onChoosePlan: () -> Void = {}
+    /// Called when the user taps a fast in progress.
+    var onOpenFast: () -> Void = {}
 
-    // Simple local session state for demo; later move to a view model if needed.
-    @State private var isFasting = false
-    @State private var startDate: Date? = nil
-    @State private var endDate: Date? = nil
+    @Environment(FastingStore.self) private var store
+    @AppStorage(PlanGuide.activePlanStorageKey) private var activePlanID = ""
+    @AppStorage(PlanGuide.customHoursStorageKey) private var customHours = 16
 
-    private var totalSeconds: Double {
-        guard let plan else { return 0 }
-        return Double(plan.fastingHours) * 3600
-    }
+    private var plan: PlanGuide? { PlanGuide.plan(withID: activePlanID) }
 
-    private var remainingSeconds: Double {
-        guard let endDate, isFasting else { return 0 }
-        return max(0, endDate.timeIntervalSinceNow)
-    }
-
-    private var progress: Double {
-        guard totalSeconds > 0, isFasting else { return 0 }
-        let elapsed = totalSeconds - remainingSeconds
-        return max(0, min(1, elapsed / totalSeconds))
-    }
-
-    private var timeString: String {
-        guard isFasting else { return "" }
-        let remaining = Int(remainingSeconds)
-        let hours = remaining / 3600
-        let minutes = (remaining % 3600) / 60
-        let seconds = remaining % 60
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%d:%02d", minutes, seconds)
+    var body: some View {
+        Group {
+            if let fast = store.current {
+                Button(action: onOpenFast) {
+                    FastInProgress(fast: fast)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows your current phase and what's happening in your body")
+            } else if let plan, !plan.supportsTimedFasts {
+                WeeklyPlanCardContent(plan: plan)
+            } else {
+                idleContent
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .modifier(ActivePlanCardBackground())
+        .animation(.spring(response: 0.35, dampingFraction: 0.9), value: store.current?.id)
+        // A success tap when a fast starts, and a lighter one when it ends.
+        .sensoryFeedback(trigger: store.current?.id) { _, newValue in
+            newValue != nil ? .success : .impact(weight: .medium)
         }
     }
 
-    var body: some View {
-        // Update the time every second when fasting.
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(plan == nil ? "Begin Here" : "Active Plan")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+    // MARK: Not fasting
 
-                        Text(plan?.name ?? "Start Fasting")
-                            .font(.title)
-                            .bold()
+    private var idleContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(plan == nil ? "Begin Here" : "Active Plan")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
 
-                        Text(planText)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(plan?.name ?? "Start Fasting")
+                        .font(.title)
+                        .bold()
 
-                    Spacer()
-
-                    // Fitting icon
-                    Image(systemName: isFasting ? "timer" : "flame")
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(Color.accentColor.opacity(0.9))
-                        .padding(10)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if isFasting {
-                    // Progress ring + time remaining
-                    HStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .stroke(.quaternary, lineWidth: 10)
+                Spacer()
 
-                            Circle()
-                                .trim(from: 0, to: progress)
-                                .stroke(
-                                    AngularGradient(
-                                        gradient: Gradient(colors: [
-                                            .accentColor.opacity(0.85),
-                                            .accentColor
-                                        ]),
-                                        center: .center
-                                    ),
-                                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                                )
-                                .rotationEffect(.degrees(-90))
-
-                            Text(timeString)
-                                .font(.headline)
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
-                        }
-                        .frame(width: 96, height: 96)
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Time remaining")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-
-                            ProgressView(value: progress)
-                                .tint(.accentColor)
-
-                            Text("\(Int(progress * 100))% complete")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-
-                        Spacer()
-                    }
-                    .transition(.opacity.combined(with: .scale))
-                } else {
-                    // Start button with modern Liquid Glass look
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-                            startSession()
-                        }
-                    } label: {
-                        Label("Start Fasting", systemImage: "timer")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(.accentColor)
-                }
+                Image(systemName: "flame")
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(Color.accentColor.opacity(0.9))
+                    .padding(10)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(20)
-            // Soft brand-colored gradient background
+
+            if let plan, plan.supportsTimedFasts {
+                Button {
+                    start(plan)
+                } label: {
+                    Label("Start Fasting", systemImage: "timer")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            } else {
+                Button(action: onChoosePlan) {
+                    Label("Choose a Plan", systemImage: "list.bullet.clipboard")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
+            }
+        }
+    }
+
+    private var subtitle: LocalizedStringResource {
+        guard let plan else { return "Choose a fasting plan to get started." }
+        guard let goal = plan.goalHours(customHours: customHours) else {
+            return plan.scheduleSummary
+        }
+        if case .custom = plan.schedule {
+            return "Fast \(goal) h, eat within \(24 - goal) h, daily"
+        }
+        return plan.scheduleSummary
+    }
+
+    private func start(_ plan: PlanGuide) {
+        guard let goal = plan.goalHours(customHours: customHours) else { return }
+        let now = Date.now
+        store.startFast(planID: plan.id, goalHours: Double(goal), at: now)
+        NotificationService.scheduleFastGoal(at: now.addingTimeInterval(Double(goal) * 3600), planName: plan.name)
+    }
+}
+
+// MARK: - Fasting
+
+/// The card's content while fasting: a live clock, time left, progress ring,
+/// and the current phase.
+private struct FastInProgress: View {
+    let fast: FastingSession
+
+    var body: some View {
+        // Ticks every second so the clock stays live.
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let progress = FastProgress(fast: fast, now: context.date)
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Fasting · \(progress.planName)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Text(progress.elapsedClock)
+                            .font(.system(.largeTitle, design: .rounded))
+                            .bold()
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+
+                        Text(progress.isGoalReached
+                             ? "Goal reached · \(progress.goalHoursText) h"
+                             : "\(progress.remainingText) to go")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(progress.isGoalReached ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    }
+
+                    Spacer(minLength: 8)
+
+                    FastProgressRing(progress: progress.fraction, lineWidth: 9) {
+                        Image(systemName: progress.isGoalReached ? "checkmark" : progress.stage.systemImage)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.tint)
+                    }
+                    .frame(width: 84, height: 84)
+                    .accessibilityHidden(true)
+                }
+
+                HStack(spacing: 8) {
+                    Image(systemName: progress.stage.systemImage)
+                        .foregroundStyle(.tint)
+                        .accessibilityHidden(true)
+                    Text(progress.stage.title)
+                        .fontWeight(.semibold)
+                    Spacer(minLength: 8)
+                    Text("Details")
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Fasting, \(progress.planName)"))
+            .accessibilityValue(progress.accessibilitySummary)
+        }
+    }
+}
+
+// MARK: - Background
+
+/// Soft brand-colored gradient on a raised surface, shared by every card state.
+private struct ActivePlanCardBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        content
             .background(
                 LinearGradient(
-                    colors: [
-                        .accentColor.opacity(0.12),
-                        .accentColor.opacity(0.04)
-                    ],
+                    colors: [.accentColor.opacity(0.12), .accentColor.opacity(0.04)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
@@ -149,40 +205,23 @@ struct ActivePlanCard: View {
                 in: RoundedRectangle(cornerRadius: 24, style: .continuous)
             )
             .overlay {
-                // Subtle stroke for definition
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
             }
             .shadow(color: .black.opacity(0.08), radius: 16, y: 8)
-            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: isFasting)
-            // Attached to the card (not the Start button) because the button
-            // leaves the screen as soon as the fast begins.
-            .sensoryFeedback(.success, trigger: isFasting)
-        }
-    }
-
-    private var planText: String {
-        if let plan {
-            return "\(plan.fastingHours) hours fasting · \(plan.eatingHours) hours eating"
-        } else {
-            return "Choose a fasting plan to get started."
-        }
-    }
-
-    private func startSession() {
-        guard let plan else { return }
-        isFasting = true
-        startDate = Date()
-        endDate = Date().addingTimeInterval(Double(plan.fastingHours) * 3600)
     }
 }
 
 #Preview("No Plan") {
-    ActivePlanCard(plan: nil)
+    ActivePlanCard()
         .padding()
+        .environment(FastingStore.preview())
 }
 
-#Preview("Active Plan") {
-    ActivePlanCard(plan: .sixteenEight)
+#Preview("Fasting") {
+    ActivePlanCard()
         .padding()
+        .environment(FastingStore.preview([
+            FastingSession(start: .now.addingTimeInterval(-13.4 * 3600), planID: "16-8", goalHours: 16),
+        ]))
 }

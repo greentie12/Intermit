@@ -27,6 +27,28 @@ enum NotificationService {
         }
     }
 
+    private static let fastGoalIdentifier = "fast-goal"
+
+    /// Schedules a "goal reached" notification for the fast in progress, if
+    /// the user has turned notifications on in Profile.
+    static func scheduleFastGoal(at date: Date, planName: String) {
+        guard UserDefaults.standard.bool(forKey: storageKey), date > .now else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Fasting Goal Reached")
+        content.body = String(localized: "You've completed your \(planName) fast. End it in Intermit when you eat.")
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: date.timeIntervalSinceNow, repeats: false)
+        let request = UNNotificationRequest(identifier: fastGoalIdentifier, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Cancels the "goal reached" notification, e.g. when a fast ends early.
+    static func cancelFastGoal() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [fastGoalIdentifier])
+    }
+
     /// Cancels any notifications the app has scheduled.
     static func removeAllPending() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()

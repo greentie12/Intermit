@@ -1,12 +1,8 @@
 import SwiftUI
 
 struct TrackView: View {
-    /// Loads the user's fasts. Placeholder history for now; swap in the real
-    /// store once fasts are saved.
-    var loadSessions: () async -> [FastingSession] = { FastingSession.samples() }
-
-    /// `nil` until the first load finishes.
-    @State private var sessions: [FastingSession]?
+    /// The user's fasts, or `nil` while they're loading.
+    var sessions: [FastingSession]?
 
     // Uses the user's calendar, locale, and time zone for day/week/month/year
     // boundaries, and updates if they change.
@@ -42,10 +38,6 @@ struct TrackView: View {
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Track")
             .navigationBarTitleDisplayMode(.large)
-            .task {
-                let loaded = await loadSessions()
-                withAnimation { sessions = loaded }
-            }
         }
     }
 
@@ -250,16 +242,13 @@ private struct TrackDashboard: View {
 }
 
 #Preview("Sample Data") {
-    TrackView()
+    TrackView(sessions: FastingSession.samples())
 }
 
 #Preview("No Fasts") {
-    TrackView(loadSessions: { [] })
+    TrackView(sessions: [])
 }
 
 #Preview("Loading") {
-    TrackView(loadSessions: {
-        try? await Task.sleep(for: .seconds(3600))
-        return []
-    })
+    TrackView(sessions: nil)
 }

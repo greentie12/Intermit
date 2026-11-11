@@ -72,12 +72,37 @@ struct PlanGuide: Identifiable {
     let readiness: LocalizedStringResource
     let breakingTheFast: [Point]
 
+    /// For weekly low-calorie plans: how fast days are chosen.
+    var weeklyRule: WeeklyRule? = nil
+    /// For weekly low-calorie plans: how much to eat on a fast day.
+    var fastDayTarget: FastDayTarget? = nil
+
     /// Daily fasting hours for plans with a daily window, used to pick which
     /// body stages to show.
     var dailyFastingHours: Int? {
         switch schedule {
         case .daily(let hours): hours
         case .custom(let range): range.upperBound
+        case .weekly: nil
+        }
+    }
+}
+
+// MARK: - Live fasting
+
+extension PlanGuide {
+    /// Whether this plan uses a timed daily fast that the Home timer can track.
+    /// Weekly low-calorie plans (5:2, 4:3, Alternate-Day) don't, yet.
+    var supportsTimedFasts: Bool {
+        if case .weekly = schedule { false } else { true }
+    }
+
+    /// The fasting goal in hours for a timed fast, using the user's chosen
+    /// hours for Custom. `nil` for weekly plans.
+    func goalHours(customHours: Int) -> Int? {
+        switch schedule {
+        case .daily(let hours): hours
+        case .custom(let range): min(range.upperBound, max(range.lowerBound, customHours))
         case .weekly: nil
         }
     }
@@ -384,7 +409,9 @@ extension PlanGuide {
                 title: "Ease Back In the Next Day",
                 text: "Start the next day with a normal-sized breakfast, not a large one."
             ),
-        ]
+        ],
+        weeklyRule: .weekdays(count: 2),
+        fastDayTarget: .calories(500...600)
     )
 
     static let eighteenSix = PlanGuide(
@@ -510,7 +537,9 @@ extension PlanGuide {
                 title: "Ease Back In the Next Day",
                 text: "Start the next day with a normal-sized breakfast, not a large one."
             ),
-        ]
+        ],
+        weeklyRule: .weekdays(count: 3),
+        fastDayTarget: .shareOfUsualIntake(0.2)
     )
 
     static let alternateDay = PlanGuide(
@@ -574,7 +603,9 @@ extension PlanGuide {
                 title: "Eat Normally Next Day",
                 text: "Have regular meals on normal days. Eating too little makes the next fast day harder."
             ),
-        ]
+        ],
+        weeklyRule: .alternating,
+        fastDayTarget: .shareOfUsualIntake(0.25)
     )
 
     static let omad = PlanGuide(

@@ -1,9 +1,6 @@
 import SwiftUI
 
 struct HomeView: View {
-    /// The user's current fasting plan, or `nil` if they haven't started one.
-    var activePlan: FastingPlan? = nil
-
     /// Called when the profile button in the header is tapped.
     var onProfileTap: () -> Void = {}
 
@@ -13,17 +10,35 @@ struct HomeView: View {
     /// Called when the body benefits tile is tapped.
     var onBenefitsTap: () -> Void = {}
 
+    /// Called when the user needs to pick a plan before fasting.
+    var onChoosePlan: () -> Void = {}
+
+    @Environment(FastingStore.self) private var store
+    @State private var showingFast = false
+
+    /// Lifetime totals for the stats tile.
+    private var lifetime: PeriodTotals {
+        TrackMetrics(sessions: store.sessions).lifetime
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     HomeHeader(onProfileTap: onProfileTap)
 
-                    ActivePlanCard(plan: activePlan)
+                    ActivePlanCard(
+                        onChoosePlan: onChoosePlan,
+                        onOpenFast: { showingFast = true }
+                    )
 
                     // Two half-width tiles sharing a row, kept the same height.
                     HStack(spacing: 12) {
-                        StatsCard(action: onStatsTap)
+                        StatsCard(
+                            totalHours: Int(lifetime.hours.rounded()),
+                            totalDays: lifetime.days,
+                            action: onStatsTap
+                        )
                         BenefitsCard(action: onBenefitsTap)
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -47,14 +62,21 @@ struct HomeView: View {
             }
             // The header provides the branding, so the bar itself stays hidden.
             .toolbarVisibility(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showingFast) {
+                ActiveFastView()
+            }
         }
     }
 }
 
-#Preview("No Plan") {
+#Preview("Not Fasting") {
     HomeView()
+        .environment(FastingStore.preview())
 }
 
-#Preview("Active Plan") {
-    HomeView(activePlan: .sixteenEight)
+#Preview("Fasting") {
+    HomeView()
+        .environment(FastingStore.preview([
+            FastingSession(start: .now.addingTimeInterval(-9.5 * 3600), planID: "16-8", goalHours: 16),
+        ]))
 }

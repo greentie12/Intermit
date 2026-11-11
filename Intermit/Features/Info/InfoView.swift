@@ -96,4 +96,5 @@ private struct InfoRow: View {
 
 #Preview {
     InfoView()
+        .environment(FastingStore.preview())
 }

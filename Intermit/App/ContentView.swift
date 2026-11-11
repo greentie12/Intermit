@@ -9,6 +9,7 @@ enum AppTab: Hashable {
 struct ContentView: View {
     @State private var selectedTab: AppTab = .home
     @AppStorage(AppearanceMode.storageKey) private var appearance: AppearanceMode = .system
+    @Environment(FastingStore.self) private var fastingStore
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -16,7 +17,8 @@ struct ContentView: View {
                 HomeView(
                     onProfileTap: { selectedTab = .profile },
                     onStatsTap: { selectedTab = .track },
-                    onBenefitsTap: { selectedTab = .info }
+                    onBenefitsTap: { selectedTab = .info },
+                    onChoosePlan: { selectedTab = .plans }
                 )
             }
 
@@ -29,7 +31,7 @@ struct ContentView: View {
             }
 
             Tab("Track", systemImage: "chart.line.uptrend.xyaxis", value: .track) {
-                TrackView()
+                TrackView(sessions: fastingStore.sessions)
             }
 
             Tab("Profile", systemImage: "person", value: .profile) {
@@ -44,4 +46,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environment(FastingStore.preview())
 }

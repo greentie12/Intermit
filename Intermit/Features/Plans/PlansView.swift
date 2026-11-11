@@ -43,4 +43,5 @@ struct PlansView: View {
 
 #Preview {
     PlansView()
+        .environment(FastingStore.preview())
 }
