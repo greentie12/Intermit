@@ -5,7 +5,7 @@ struct UserProfile {
     var name: String
     var isPro: Bool
 
-    /// Up to two initials from the user's name, e.g. "Alex Rivera" → "AR".
+    /// Up to two initials from the user's name, e.g. "Damaris Dominguez" → "DD".
     var initials: String {
         name.split(separator: " ")
             .prefix(2)
@@ -17,6 +17,6 @@ struct UserProfile {
 }
 
 extension UserProfile {
-    static let samplePro = UserProfile(name: "Alex Rivera", isPro: true)
-    static let sampleFree = UserProfile(name: "Alex Rivera", isPro: false)
+    static let samplePro = UserProfile(name: "Damaris Dominguez", isPro: true)
+    static let sampleFree = UserProfile(name: "Damaris Dominguez", isPro: false)
 }
