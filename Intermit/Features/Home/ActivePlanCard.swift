@@ -12,6 +12,12 @@ struct ActivePlanCard: View {
     @Environment(FastingStore.self) private var store
     @AppStorage(PlanGuide.activePlanStorageKey) private var activePlanID = ""
     @AppStorage(PlanGuide.customHoursStorageKey) private var customHours = 16
+    @AppStorage(NotificationService.storageKey) private var notificationsEnabled = false
+    @AppStorage(NotificationService.askedAtFastStartStorageKey) private var askedAtFastStart = false
+
+    @State private var showingNotificationOffer = false
+    @State private var showingNotificationsDenied = false
+    @Environment(\.openURL) private var openURL
 
     private var plan: PlanGuide? { PlanGuide.plan(withID: activePlanID) }
 
@@ -37,6 +43,21 @@ struct ActivePlanCard: View {
         // A success tap when a fast starts, and a lighter one when it ends.
         .sensoryFeedback(trigger: store.current?.id) { _, newValue in
             newValue != nil ? .success : .impact(weight: .medium)
+        }
+        // Asked once, the first time a fast starts with notifications off.
+        .alert("Get Updates as You Fast?", isPresented: $showingNotificationOffer) {
+            Button("Turn On Notifications") { turnOnNotifications() }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("Intermit can let you know when your fast reaches each new phase and when you hit your goal. You can change this anytime in Profile.")
+        }
+        .alert("Notifications Are Off", isPresented: $showingNotificationsDenied) {
+            if let url = NotificationService.settingsURL {
+                Button("Open Settings") { openURL(url) }
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("To get phase updates, allow notifications for Intermit in Settings.")
         }
     }
 
@@ -104,9 +125,26 @@ struct ActivePlanCard: View {
 
     private func start(_ plan: PlanGuide) {
         guard let goal = plan.goalHours(customHours: customHours) else { return }
-        let now = Date.now
-        store.startFast(planID: plan.id, goalHours: Double(goal), at: now)
-        NotificationService.scheduleFastGoal(at: now.addingTimeInterval(Double(goal) * 3600), planName: plan.name)
+        // Phase and goal alerts are scheduled by ContentView when the fast changes.
+        store.startFast(planID: plan.id, goalHours: Double(goal))
+
+        if !notificationsEnabled && !askedAtFastStart {
+            askedAtFastStart = true // Whatever they answer, don't ask again.
+            showingNotificationOffer = true
+        }
+    }
+
+    /// Shows the system permission prompt (or uses an earlier answer). If
+    /// allowed, turning the setting on schedules alerts for this fast.
+    private func turnOnNotifications() {
+        Task {
+            if await NotificationService.requestAuthorization() {
+                notificationsEnabled = true
+            } else {
+                // Declined before, so iOS won't ask again; point to Settings.
+                showingNotificationsDenied = true
+            }
+        }
     }
 }
 

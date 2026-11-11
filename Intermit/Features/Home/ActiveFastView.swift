@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Progress
 
 /// Everything the live fast screens show, worked out for one moment in time.
+@MainActor
 struct FastProgress {
     let fast: FastingSession
     let now: Date
@@ -410,13 +411,11 @@ struct ActiveFastView: View {
 
     private func endFast() {
         store.endFast()
-        NotificationService.cancelFastGoal()
         dismiss()
     }
 
     private func discardFast() {
         store.discardFast()
-        NotificationService.cancelFastGoal()
         dismiss()
     }
 }

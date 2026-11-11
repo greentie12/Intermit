@@ -7,6 +7,9 @@ struct ProfileView: View {
 
     @AppStorage(AppearanceMode.storageKey) private var appearance: AppearanceMode = .system
     @AppStorage(NotificationService.storageKey) private var notificationsEnabled = false
+    @AppStorage(NotificationService.phaseStorageKey) private var phaseNotificationsEnabled = true
+    @AppStorage(NotificationService.goalStorageKey) private var goalNotificationsEnabled = true
+    @Environment(FastingStore.self) private var fastingStore
     @State private var showingSubscriptionNotice = false
     @State private var showingNotificationsDenied = false
 
@@ -22,7 +25,11 @@ struct ProfileView: View {
             notificationsEnabled = isOn
             if isOn {
                 Task {
-                    if !(await NotificationService.requestAuthorization()) {
+                    if await NotificationService.requestAuthorization() {
+                        // Permission can arrive after the toggle flips, so
+                        // schedule alerts for a fast already in progress now.
+                        await NotificationService.syncFastNotifications(for: fastingStore.current)
+                    } else {
                         notificationsEnabled = false
                         showingNotificationsDenied = true
                     }
@@ -72,7 +79,26 @@ struct ProfileView: View {
                     Toggle(isOn: notificationsBinding) {
                         SettingsLabel("Notifications", systemImage: "bell.fill")
                     }
+
+                    if notificationsEnabled {
+                        Toggle(isOn: $phaseNotificationsEnabled) {
+                            SettingsDetailLabel(
+                                "Phase Updates",
+                                detail: "When your fast enters a new metabolic phase",
+                                systemImage: "waveform.path.ecg"
+                            )
+                        }
+
+                        Toggle(isOn: $goalNotificationsEnabled) {
+                            SettingsDetailLabel(
+                                "Goal Reached",
+                                detail: "When you hit your plan's fasting goal",
+                                systemImage: "flag.checkered"
+                            )
+                        }
+                    }
                 }
+                .animation(.default, value: notificationsEnabled)
 
                 Section("Support and Legal") {
                     SettingsLinkRow(
@@ -233,6 +259,36 @@ private struct StatItem: View {
 
 // MARK: - Settings rows
 
+/// A settings row label with a second line explaining it.
+private struct SettingsDetailLabel: View {
+    let title: LocalizedStringResource
+    let detail: LocalizedStringResource
+    let systemImage: String
+
+    init(_ title: LocalizedStringResource, detail: LocalizedStringResource, systemImage: String) {
+        self.title = title
+        self.detail = detail
+        self.systemImage = systemImage
+    }
+
+    var body: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: systemImage)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
 /// A settings row label with an accent-colored SF Symbol.
 private struct SettingsLabel: View {
     let title: LocalizedStringResource
@@ -280,8 +336,10 @@ private struct SettingsLinkRow: View {
 
 #Preview("Pro") {
     ProfileView(profile: .samplePro, stats: .sample)
+        .environment(FastingStore.preview())
 }
 
 #Preview("Free") {
     ProfileView(profile: .sampleFree, stats: .empty)
+        .environment(FastingStore.preview())
 }
