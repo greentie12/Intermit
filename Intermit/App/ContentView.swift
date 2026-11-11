@@ -16,6 +16,19 @@ struct ContentView: View {
     @AppStorage(NotificationService.phaseStorageKey) private var phaseNotificationsEnabled = true
     @AppStorage(NotificationService.goalStorageKey) private var goalNotificationsEnabled = true
 
+    @AppStorage(PlanGuide.activePlanStorageKey) private var activePlanID = ""
+    @AppStorage(PlanGuide.customHoursStorageKey) private var customHours = 16
+
+    /// Everything the widget shows.
+    private struct WidgetSyncKey: Equatable {
+        var activePlanID: String
+        var customHours: Int
+        var fast: FastingSession?
+        var weeklySchedule: WeeklySchedule?
+        var fastDayLogCount: Int
+        var isActive: Bool
+    }
+
     /// Everything that affects which fast alerts should be scheduled.
     private struct NotificationSyncKey: Equatable {
         var fastID: UUID?
@@ -66,6 +79,17 @@ struct ContentView: View {
             isActive: scenePhase == .active
         )) {
             await NotificationService.syncFastNotifications(for: fastingStore.current)
+        }
+        // Keep the Home and Lock Screen widgets showing the current plan and fast.
+        .task(id: WidgetSyncKey(
+            activePlanID: activePlanID,
+            customHours: customHours,
+            fast: fastingStore.current,
+            weeklySchedule: fastingStore.weeklySchedule,
+            fastDayLogCount: fastingStore.fastDayLogs.count,
+            isActive: scenePhase == .active
+        )) {
+            WidgetSync.update(store: fastingStore, activePlanID: activePlanID, customHours: customHours)
         }
     }
 }
